@@ -1,0 +1,42 @@
+[
+  {
+    "directory": "epson2paperless",
+    "url": "https://github.com/mtheuma/epson2paperless.git",
+    "commit": "bf64ee0f1774ddc8aca1c3c6713c1c7fbe1b16ca"
+  },
+  {
+    "directory": "jscanify",
+    "url": "https://github.com/puffinsoft/jscanify.git",
+    "commit": "954863b80e8407bbd2a659fcba6583ce3176a419"
+  },
+  {
+    "directory": "opencvjs-document-scanner",
+    "url": "https://github.com/tony-xlh/opencvjs-document-scanner.git",
+    "commit": "4122ab681dc1a406b91dfe0e7cafecd5a1f5ba1d"
+  },
+  {
+    "directory": "sane-airscan",
+    "url": "https://github.com/alexpevzner/sane-airscan.git",
+    "commit": "1d8f1f80820ff3871bfe0e5eb666deea19c0540a"
+  },
+  {
+    "directory": "sane-backends",
+    "url": "https://gitlab.com/sane-project/backends.git",
+    "commit": "36c87fc33d91ebd60f70a0934f2e44ffd9a818d2"
+  },
+  {
+    "directory": "sane-wasm",
+    "url": "https://github.com/goncalomb/sane-wasm.git",
+    "commit": "c1aea0085d9f1af3f0faadd0120151c01bbe717d"
+  },
+  {
+    "directory": "smartcrop-pdf-web",
+    "url": "https://github.com/pavel9860/smartcrop-pdf-web.git",
+    "commit": "df0130947173ffbec968983dee286536898a439b"
+  },
+  {
+    "directory": "webscan",
+    "url": "https://github.com/goncalomb/webscan.git",
+    "commit": "e1d1ef33cf73d9a7e1d1d79a78f14e37b6857156"
+  }
+]

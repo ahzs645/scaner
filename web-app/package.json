@@ -1,0 +1,32 @@
+{
+  "name": "ff680w-browser",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "dev": "npm run build && node scripts/serve.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prepare-browser-tests": "npm run build && node scripts/prepare-browser-tests.mjs",
+    "desktop": "npm run build && electron desktop/main.mjs",
+    "test:desktop": "npm run build && node --test desktop/tests/*.test.mjs",
+    "package:desktop": "npm run build && node scripts/package-desktop.mjs"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "@types/w3c-web-usb": "1.0.14",
+    "electron": "44.7.0",
+    "esbuild": "0.25.12",
+    "fake-indexeddb": "6.2.5",
+    "typescript": "7.0.2"
+  },
+  "license": "GPL-2.0-only",
+  "dependencies": {
+    "@tesseract.js-data/osd": "1.0.0",
+    "jpeg-js": "0.4.4",
+    "lcms-wasm": "1.0.5",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0"
+  }
+}

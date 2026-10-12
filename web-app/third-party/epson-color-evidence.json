@@ -1,0 +1,266 @@
+{
+  "schema_version": 1,
+  "purpose": "Read-only research metadata; no Epson resource or ICC payload is distributed here. Not a runtime color profile.",
+  "date": "2026-10-11",
+  "scope": {
+    "model": "EPSON FF-680W",
+    "hardware_access": false,
+    "runtime_execution": false,
+    "artifact_root": "/Library/Image Capture/Support/EPSON/Epson Scan 2"
+  },
+  "model": {
+    "path": "/Library/Image Capture/Support/EPSON/Epson Scan 2/Models/ES0170/ES0170.bundle/Contents/Resources/ALL/ES0170.plist",
+    "bytes": 2460,
+    "sha256": "11b120c02066274a1d52a52692db30d2800f3cd85040b4548b64e7c34df5a403"
+  },
+  "convert_table": {
+    "path": "/Library/Image Capture/Support/EPSON/Epson Scan 2/Models/ES0170/ES0170.bundle/Contents/Resources/ConvertTable.plist",
+    "bytes": 2172,
+    "sha256": "1774246e9679b3f9c35b7e4a55d1267d6b2c1f7bea58dba692b5a561bc847b3d"
+  },
+  "tables": [
+    {
+      "path": "/Library/Image Capture/Support/EPSON/Epson Scan 2/Models/Common/Tables/Profile.bundle/Contents/Resources/Profile/ESProfile0082.plist",
+      "bytes": 308,
+      "sha256": "e34629376ed914945f61bf09d664edea7c74a445800652843791622b3c7a34c0",
+      "id": "ESProfile0082",
+      "role": "Model Profile / ESProfileTable",
+      "decoded_type": "Reflective/Negative/Positive3x3 integer channel matrices, no ICC data",
+      "limitation": "Divide Reflective integers by10000 gives exact numeric match to SANE lut_id2 matrix branch; actual hardware/host application not traced"
+    },
+    {
+      "path": "/Library/Image Capture/Support/EPSON/Epson Scan 2/Models/Common/Tables/Profile.bundle/Contents/Resources/Profile/ESProfile1047.plist",
+      "bytes": 265,
+      "sha256": "b6450728572dd0fc6256bdfc1b05038e87a935e416842899b645711ce469f2eb",
+      "id": "ESProfile1047",
+      "role": "GrayBalanceGamma / ESGrayBalanceGammaTable",
+      "decoded_type": "3x3 integer matrices; Reflective diagonal differs from unit identity",
+      "limitation": "Exact host/acquisition application and scale not runtime verified"
+    },
+    {
+      "path": "/Library/Image Capture/Support/EPSON/Epson Scan 2/Models/Common/Tables/LUT.bundle/Contents/Resources/LUT/ESLUT0016.plist",
+      "bytes": 455,
+      "sha256": "5c56f4fe5cf321e83289d1102f8d52bfaee729e066a21b32cbf8b2565180d4d8",
+      "id": "ESLUT0016",
+      "role": "DefaultLUT / ESDefaultLUTTable",
+      "decoded_type": "RGB shadow/highlight/gamma recipe and curve IDs, not raw256-entry GMT data",
+      "limitation": "Selected with ESCurrentMode1; FIT curve generation and mode interpretation unresolved"
+    }
+  ],
+  "rea_evidence": [
+    {
+      "id": "ev_d99b72d67c82f16b052e37d5c32bff143334ec8c5bc92cecf150ed6a8dd1962f",
+      "retained_path": "../../docs/rea-evidence/scanner-dispatch.json",
+      "target_sha256": "cae0ae95bc6794ffd613d893f6f3146557c1673c92b1dcd9ceea2773370e069f",
+      "coverage": "Native dispatch metadata partial; no native decompiler configured"
+    },
+    {
+      "id": "ev_d03bd1f3496764182861cc4abfda91e88db9cdb9b4133a661bbd3a358dc8dd19",
+      "retained_path": "../../docs/rea-evidence/dtr2-macho.json",
+      "target_sha256": "a64e08b175c9b5365b1132b8c91b7561f58749fccc2a6b4dd96776deba1a9fc3"
+    }
+  ],
+  "icc_search": {
+    "method": "Scan every file for acsp at header+36; validate declared profile size and all tag offset/size bounds; decode desc and header class. No bytes exported.",
+    "files_scanned": 1077,
+    "bytes_scanned": 95767366,
+    "maximum_file_bytes": 67108864,
+    "files_skipped": 0,
+    "plists_parsed": 655,
+    "plist_data_blobs": 0,
+    "standalone_icc_icm_files": 0,
+    "embedded_candidates": 291,
+    "unique_profiles": [
+      {
+        "sha256": "ee2f821d16d12ec9e9f2958ac8865f40912d0ce1fb9625a31b594fab942b1caf",
+        "bytes": 4456,
+        "device_class": "mntr",
+        "color_space": "GRAY",
+        "pcs": "XYZ ",
+        "description": "Generic Gray Gamma 2.2 Profile",
+        "occurrences": 95,
+        "example": {
+          "path": "/Library/Image Capture/Support/EPSON/Epson Scan 2/Core/EpsonScan2.framework/Versions/A/Resources/EPSScanSettingViewControllerRTL.nib",
+          "profile_offset": 3158,
+          "container_sha256": "e0c559c7cd23933aaaa5f5c8b95db48e52ba12cd127d76ccb41864e260976f97"
+        },
+        "container_extensions": [
+          ".nib"
+        ]
+      },
+      {
+        "sha256": "2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e",
+        "bytes": 3144,
+        "device_class": "mntr",
+        "color_space": "RGB ",
+        "pcs": "XYZ ",
+        "description": "sRGB IEC61966-2.1",
+        "occurrences": 192,
+        "example": {
+          "path": "/Library/Image Capture/Support/EPSON/Epson Scan 2/Core/EpsonScan2.framework/Versions/A/Resources/icon_colorbarance_cyan.tiff",
+          "profile_offset": 1236,
+          "container_sha256": "11dbe7307d6143dfcebdcbb92c6e3eec4fde01c802f685b0325dbf0c85113f78"
+        },
+        "container_extensions": [
+          ".nib",
+          ".tiff"
+        ]
+      },
+      {
+        "sha256": "60e0c8c43881d7c2d0823a28bbf182b6b7f91872610cecfc0cc53430f0a60e9c",
+        "bytes": 3264,
+        "device_class": "mntr",
+        "color_space": "RGB ",
+        "pcs": "XYZ ",
+        "description": "Display",
+        "occurrences": 2,
+        "example": {
+          "path": "/Library/Image Capture/Support/EPSON/Epson Scan 2/Core/EpsonScan2.framework/Versions/A/Resources/bmp_edgefill_image.tiff",
+          "profile_offset": 3168,
+          "container_sha256": "50ccd553f1f8dcfcbadb83c32f88b709ab2667eda94ed27a43a333422eb40622"
+        },
+        "container_extensions": [
+          ".tiff"
+        ]
+      },
+      {
+        "sha256": "67effac6c9ae32284244ac0202a96a3c054abf1c7ff658d4841d9849f5cb5d18",
+        "bytes": 1980,
+        "device_class": "mntr",
+        "color_space": "GRAY",
+        "pcs": "XYZ ",
+        "description": "Generic Gray Profile",
+        "occurrences": 2,
+        "example": {
+          "path": "/Library/Image Capture/Support/EPSON/Epson Scan 2/Core/EpsonScan2.framework/Versions/A/Resources/EPSPhotoPreviewViewController.nib",
+          "profile_offset": 21741,
+          "container_sha256": "25fe0274f7107a4f97285409239bcff155dd3880bca898c31589be4f4769a332"
+        },
+        "container_extensions": [
+          ".nib"
+        ]
+      }
+    ],
+    "scanner_input_profile_found": false,
+    "interpretation": "All observed candidates are monitor-class profiles in nib/tiff UI assets. This bounded negative result does not cover other installations or runtime-generated profiles."
+  },
+  "sane": {
+    "repository": "https://gitlab.com/sane-project/backends",
+    "commit": "36c87fc33d91ebd60f70a0934f2e44ffd9a818d2",
+    "source": {
+      "path": "references/sane-backends/backend/epsonds.c",
+      "bytes": 111683,
+      "sha256": "c78b8b8a10275800d6b2d44f6435b1fac7c1e3361fe45d8e7e223e33acabf545"
+    },
+    "license": "GPL-2.0-only as stated in backend source; preserve attribution for reused LUT/code",
+    "ff680w_lut_id": 2,
+    "hardware_gamma": "UG18",
+    "rgb_lut_fingerprints": {
+      "LUT": {
+        "bytes": 256,
+        "sha256": "930bd454e50a796983c7e48dbaf7656be886cd9c3d6a08edae12507c318dbb48",
+        "entries_different_from_identity": 253,
+        "matches_our_grayscale": true
+      },
+      "LUT_R": {
+        "bytes": 256,
+        "sha256": "816772bc1478136c5e292cac3b5708483609e64f86fb8145b2d0ddbccbde1351",
+        "entries_different_from_identity": 252
+      },
+      "LUT_G": {
+        "bytes": 256,
+        "sha256": "930bd454e50a796983c7e48dbaf7656be886cd9c3d6a08edae12507c318dbb48",
+        "entries_different_from_identity": 253
+      },
+      "LUT_B": {
+        "bytes": 256,
+        "sha256": "930bd454e50a796983c7e48dbaf7656be886cd9c3d6a08edae12507c318dbb48",
+        "entries_different_from_identity": 253
+      }
+    },
+    "emitted_matrix": {
+      "rgb_rows": [
+        [
+          0.9864,
+          0.0248,
+          -0.0112
+        ],
+        [
+          0.0021,
+          1.01,
+          -0.0112
+        ],
+        [
+          0.0139,
+          -0.1249,
+          1.111
+        ]
+      ],
+      "rounded_scale32_rgb_rows": [
+        [
+          31,
+          1,
+          0
+        ],
+        [
+          0,
+          32,
+          0
+        ],
+        [
+          0,
+          -4,
+          36
+        ]
+      ],
+      "mode": "UM08",
+      "wire_order_index": [
+        4,
+        1,
+        7,
+        3,
+        0,
+        6,
+        5,
+        2,
+        8
+      ],
+      "nine_bytes_hex": "200184001f00000024",
+      "padding_bytes_hex": "000000",
+      "note": "Source unconditionally overwrites family-specific matrix values before encoding; these are final emitted coefficients, not Epson0082."
+    }
+  },
+  "recommendations": {
+    "icc_reconstruction_from_referenced_tables": false,
+    "automatically_apply_epson_resources": false,
+    "optional_sane_preset_label": "SANE family2 acquisition (experimental; not Epson parity or ICC)",
+    "calibration_signature_fields": [
+      "schemaVersion",
+      "driverId",
+      "modelId",
+      "deviceSerialOrExplicitUnknown",
+      "firmwareVersion",
+      "surface",
+      "mode",
+      "dpi",
+      "jpegQuality",
+      "gammaModeRaw",
+      "rgbLutSha256ByChannel",
+      "colorMatrixMode",
+      "encodedMatrixSha256OrAbsent",
+      "paperGeometry",
+      "crop",
+      "deskew",
+      "doubleFeed",
+      "acquisitionSerializerVersion",
+      "decodedRgbInterpretation"
+    ],
+    "exclude_from_color_signature": [
+      "jobPageCount",
+      "transferBlockSize",
+      "networkHost",
+      "transportSessionId"
+    ],
+    "unknown_matrix_mode": "Record absent when no explicit CMX is sent; do not label it UNIT without readback evidence"
+  }
+}

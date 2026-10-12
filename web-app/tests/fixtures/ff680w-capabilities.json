@@ -1,0 +1,82 @@
+{
+  "model": "EPSON FF-680W",
+  "provenance": "CAPA-only snapshot from controlled USB validation, 2026-10-11. No identity, serial number, status, scan image or user data.",
+  "CAPA": [
+    {
+      "name": "ADF",
+      "value": "DPLX"
+    },
+    {
+      "name": "ADF",
+      "value": "PEDT"
+    },
+    {
+      "name": "ADF",
+      "value": "DFL1DFL3"
+    },
+    {
+      "name": "ADF",
+      "value": "LDF "
+    },
+    {
+      "name": "ADF",
+      "value": "EJCT"
+    },
+    {
+      "name": "ADF",
+      "value": "CRP "
+    },
+    {
+      "name": "ADF",
+      "value": "SKEW"
+    },
+    {
+      "name": "ADF",
+      "value": "OVSN"
+    },
+    {
+      "name": "ADF",
+      "value": "RSMSLISTd300d600"
+    },
+    {
+      "name": "COL",
+      "value": "LISTC024M008R008G008B008"
+    },
+    {
+      "name": "FMT",
+      "value": "LISTJPG "
+    },
+    {
+      "name": "JPG",
+      "value": "RANGd001d100"
+    },
+    {
+      "name": "GMM",
+      "value": "LISTUG10UG18"
+    },
+    {
+      "name": "GMT",
+      "value": "LISTRED GRN BLU MONO"
+    },
+    {
+      "name": "CMX",
+      "value": "LISTUNITUM08"
+    },
+    {
+      "name": "RSM",
+      "value": "LISTd050d075d100d150d200d240d300d360d400d600"
+    },
+    {
+      "name": "RSS",
+      "value": "LISTd050d075d100d150d200d240d300d360d400d600"
+    },
+    {
+      "name": "CRP",
+      "value": "RANGi-000020d020"
+    },
+    {
+      "name": "LAM",
+      "value": "LISTON  OFF "
+    }
+  ]
+}

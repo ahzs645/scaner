@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ff680w-re"
+version = "0.1.0"
+description = "Reverse-engineering workspace for Epson FF-680W USB-first scanning support"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "pyusb>=1.2.1,<2",
+]
+
+[project.optional-dependencies]
+network = [
+  "zeroconf>=0.136,<1",
+]
+
+[project.scripts]
+ff680w = "ff680w_re.cli:main"
+ff680w-webusb = "ff680w_re.browser:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ff680w_re"]
+

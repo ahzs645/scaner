@@ -1,0 +1,14 @@
+{
+  "lcms-wasm": {
+    "version": "1.0.5",
+    "gitHead": "762214c66e907674c8a5538223c624291f5039dd",
+    "LittleCMS": "2.16",
+    "LittleCMSCommit": "c2a54017d73080f97c5cd34a78ff2fb51564aade",
+    "license": "MIT"
+  },
+  "srgb.icc": {
+    "generated": "Pillow ImageCms.createProfile(sRGB), LittleCMS 2.19",
+    "timestamp": "fixed2024-01-01",
+    "purpose": "explicit destination/export sRGB profile; never an assumed scanner source"
+  }
+}
