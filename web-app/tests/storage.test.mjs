@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {IDBFactory} from 'fake-indexeddb';
 import {ScanStore} from '../dist/storage.js';
 import {DEFAULT_OPTIONS} from '../dist/planner.js';
+import {editRevision} from '../dist/processing/history.js';
 
 const jpeg=Uint8Array.of(255,216,1,2,3,255,217);
 const capture=(filename='001-front.jpg',overrides={})=>({filename,sheet:1,side:'front',image:Uint8Array.from(jpeg),...overrides});
@@ -20,6 +21,35 @@ async function withStorage(run){
  try{await run({store,factory,name,decodes,closed:()=>closed,invalid:value=>{invalid=value;}});}
  finally{for(const [key,descriptor] of saved){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}}
 }
+
+test('undo and redo survive reopening storage, branch on a new edit, and preserve original capture bytes',async()=>{
+ await withStorage(async({store,name})=>{
+  const job=await store.createJob({...DEFAULT_OPTIONS});const original=await store.saveImage(job.id,capture());await store.finish(job.id,'complete');
+  const render=recipe=>({recipe,blob:recipe.rotation?new Blob(['edited'],{type:'image/png'}):original.blob,width:recipe.rotation===90||recipe.rotation===270?3300:2544,height:recipe.rotation===90||recipe.rotation===270?2544:3300,notices:[]});
+  let saved=await store.saveEdit(job.id,original.filename,render({version:1,rotation:90,crop:null}));
+  saved=await store.saveEdit(job.id,original.filename,render({version:1,rotation:180,crop:null}));
+  const undo=editRevision(saved,'undo');saved=await store.saveEdit(job.id,original.filename,render(undo.recipe),undo.history,undo.redo);
+  assert.equal(saved.recipe.rotation,90);assert.equal(saved.redo.at(-1).rotation,180);
+  const reopened=new ScanStore(name);saved=(await reopened.edits(job.id))[0];const redo=editRevision(saved,'redo');
+  saved=await reopened.saveEdit(job.id,original.filename,render(redo.recipe),redo.history,redo.redo);
+  assert.equal(saved.recipe.rotation,180);assert.equal(saved.redo.length,0);assert.equal(saved.history.at(-1).rotation,90);
+  const undoAgain=editRevision(saved,'undo');await reopened.saveEdit(job.id,original.filename,render(undoAgain.recipe),undoAgain.history,undoAgain.redo);
+  saved=await reopened.saveEdit(job.id,original.filename,render({version:1,rotation:270,crop:null}));
+  assert.equal(editRevision(saved,'redo'),undefined);assert.equal(saved.history.at(-1).rotation,90);
+  assert.deepEqual(new Uint8Array(await (await reopened.images(job.id))[0].blob.arrayBuffer()),jpeg);
+ });
+});
+
+test('invalid redo history cannot overwrite a valid saved edit',async()=>{
+ await withStorage(async({store})=>{
+  const job=await store.createJob({...DEFAULT_OPTIONS});await store.saveImage(job.id,capture());
+  const result={recipe:{version:1,rotation:90,crop:null},blob:new Blob(['png'],{type:'image/png'}),width:3300,height:2544,notices:[]};
+  await store.saveEdit(job.id,'001-front.jpg',result);const before=await store.edits(job.id);
+  await assert.rejects(store.saveEdit(job.id,'001-front.jpg',result,[],[{version:1,rotation:45,crop:null}]),/Rotation/);
+  await assert.rejects(store.saveEdit(job.id,'001-front.jpg',result,[],Array(21).fill(result.recipe)),/20 revisions/);
+  assert.deepEqual(await store.edits(job.id),before);
+ });
+});
 async function alterJob(factory,name,id,changes){
  const db=await new Promise((resolve,reject)=>{const request=factory.open(name);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
  try{

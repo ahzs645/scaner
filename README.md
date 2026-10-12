@@ -27,6 +27,9 @@ Saved scans belong to the current browser and website origin. Jobs from the
 localhost development app do not automatically move to GitHub Pages. Export
 anything you need to retain before clearing browser storage.
 
+See [keyboard shortcuts](docs/keyboard-shortcuts.md) or press `?` in the app
+for capture, editing, navigation and export commands.
+
 ## Develop
 
 Requires Node.js 26 and npm.

@@ -22,7 +22,7 @@ export interface ProcessingResult {
   detection?:Detection; orientation?:OrientationDecision & {inputRotation:QuarterTurn}; notices:string[];
 }
 export interface SavedEdit extends ProcessingResult {
-  jobId:string; filename:string; updated:string; history:ProcessingRecipe[];
+  jobId:string; filename:string; updated:string; history:ProcessingRecipe[]; redo?:ProcessingRecipe[];
 }
 export interface ImageProcessor {
   process(source:ImageSource,request:ProcessingRequest,signal?:AbortSignal):Promise<ProcessingResult>;

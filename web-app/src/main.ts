@@ -10,6 +10,8 @@ import type {ScannerDriver,Capabilities,DeviceSettings,ScanOptions} from './driv
 import {OrientationDetector} from './processing/orientation.js';
 import {WorkerImageProcessor} from './processing/client.js';
 import {originalRecipe,isEdited,applyOrientation} from './processing/types.js';
+import {editRevision} from './processing/history.js';
+import {installShortcuts,SHORTCUTS} from './shortcuts.js';
 import type {ProcessingRecipe,ProcessingResult,SavedEdit} from './processing/types.js';
 import {ScanStore} from './storage.js';
 import type {Job,SavedImage} from './storage.js';
@@ -30,7 +32,7 @@ let scanner:ScannerDriver|undefined;
 const processor=new WorkerImageProcessor();
 const orientation=new OrientationDetector();
 let colorSelection:ProfileRecord|null=null;
-type EditOperation='color'|'remove-color'|'left'|'right'|'crop'|'orient'|'auto'|'restore'|'undo';
+type EditOperation='color'|'remove-color'|'left'|'right'|'crop'|'orient'|'auto'|'restore'|'undo'|'redo';
 const edits=new Map<string,SavedEdit>(),editUrls=new Map<string,string>(),processingMessages=new Map<string,string>();
 let phase:'scan'|'processing'|undefined;
 const workspace=document.querySelector<HTMLElement>('.workspace')!;
@@ -63,6 +65,7 @@ function controls():void {
   input('auto-process').disabled=busy;input('auto-orient-after').disabled=busy;
   const undoTargets=processTargets();
   button('undo-edit').disabled=busy||!hasPage||!undoTargets.some(image=>!!edits.get(image.filename)?.history.length);
+  button('redo-edit').disabled=busy||!hasPage||!undoTargets.some(image=>!!edits.get(image.filename)?.redo?.length);
   button('previous').disabled=busy||selected<=0;
   button('next').disabled=busy||selected<0||selected>=currentImages.length-1;
   element('connection-label').textContent=connected?scanner!.profile.label+' connected':'Scanner disconnected';
@@ -198,15 +201,15 @@ function renderPreview():void {
     const scale=Math.min(width/view.width,height/view.height);image.width=Math.round(view.width*scale);image.height=Math.round(view.height*scale);
   }else{image.width=Math.round(view.width*Number(zoom)/100);image.height=Math.round(view.height*Number(zoom)/100);}
 }
-async function saveProcessed(saved:SavedImage,result:ProcessingResult,historyOverride?:ProcessingRecipe[]):Promise<void> {
+async function saveProcessed(saved:SavedImage,result:ProcessingResult,historyOverride?:ProcessingRecipe[],redoOverride?:ProcessingRecipe[]):Promise<void> {
   const previous=edits.get(saved.filename);
   if(!result.detection&&previous?.detection&&JSON.stringify(previous.recipe.crop)===JSON.stringify(result.recipe.crop))result={...result,detection:previous.detection};
-  const edit=await store.saveEdit(saved.jobId,saved.filename,result,historyOverride);edits.set(saved.filename,edit);
+  const edit=await store.saveEdit(saved.jobId,saved.filename,result,historyOverride,redoOverride);edits.set(saved.filename,edit);
   const oldUrl=editUrls.get(saved.filename);if(oldUrl)URL.revokeObjectURL(oldUrl);editUrls.set(saved.filename,URL.createObjectURL(edit.blob));
   processingMessages.delete(saved.filename);updateThumbnails();renderPreview();
 }
 async function processPage(saved:SavedImage,operation:EditOperation,signal?:AbortSignal):Promise<boolean> {
-  const previous=edits.get(saved.filename);let recipe=structuredClone(previous?.recipe??originalRecipe());let historyOverride:ProcessingRecipe[]|undefined;
+  const previous=edits.get(saved.filename);let recipe=structuredClone(previous?.recipe??originalRecipe());let historyOverride:ProcessingRecipe[]|undefined,redoOverride:ProcessingRecipe[]|undefined;
   if(operation==='left'||operation==='right')recipe.rotation=((recipe.rotation+(operation==='right'?90:270))%360) as ProcessingRecipe['rotation'];
   if(operation==='restore'){recipe.rotation=0;recipe.crop=null;delete recipe.color;}
   if(operation==='remove-color')delete recipe.color;
@@ -215,9 +218,9 @@ async function processPage(saved:SavedImage,operation:EditOperation,signal?:Abor
     if(colorSelection.captureSignature&&colorSelection.captureSignature!==captureSignature(currentJob,saved.side))throw Error('Profile does not match '+saved.filename+' capture settings and scan side');
     recipe.color={profileId:colorSelection.id,profileName:colorSelection.name,intent:'relative-colorimetric',output:'srgb',source:colorSelection.source};
   }
-  if(operation==='undo'){
-    const prior=previous?.history.at(-1);if(!prior)return false;
-    recipe=structuredClone(prior);historyOverride=previous!.history.slice(0,-1);
+  if(operation==='undo'||operation==='redo'){
+    const revision=editRevision(previous,operation);if(!revision)return false;
+    recipe=revision.recipe;historyOverride=revision.history;redoOverride=revision.redo;
   }
   const colorProfile=recipe.color?(await colorUI.library.get(recipe.color.profileId)).bytes:undefined;
   let result=await processor.process(saved,{recipe,autoCrop:operation==='crop'||operation==='auto',colorProfile},signal);
@@ -235,8 +238,8 @@ async function processPage(saved:SavedImage,operation:EditOperation,signal?:Abor
   }
   const changed=JSON.stringify(result.recipe)!==JSON.stringify(previous?.recipe??originalRecipe());
   if(!changed&&!result.orientation)return false;
-  if(!changed)historyOverride=previous?.history??[];
-  await saveProcessed(saved,result,historyOverride);
+  if(!changed){historyOverride=previous?.history??[];redoOverride=previous?.redo??[];}
+  await saveProcessed(saved,result,historyOverride,redoOverride);
   if(result.orientation&&!changed)processingMessages.set(saved.filename,result.orientation.reason);
   renderPreview();log(saved.filename+': '+(changed?'saved '+result.width+' × '+result.height+' '+result.blob.type+' edit':'saved orientation result'));return changed;
 }
@@ -311,7 +314,7 @@ button('previous').onclick=()=>selectPage(selected-1);button('next').onclick=()=
 button('rotate-left').onclick=()=>editPages('left',true);button('rotate-right').onclick=()=>editPages('right',true);
 button('edit-left').onclick=()=>editPages('left');button('edit-right').onclick=()=>editPages('right');
 select('process-scope').onchange=controls;
-button('auto-crop').onclick=()=>editPages('crop');button('auto-orient').onclick=()=>editPages('orient');button('auto-enhance').onclick=()=>editPages('auto');button('undo-edit').onclick=()=>editPages('undo');button('restore-original').onclick=()=>editPages('restore');
+button('auto-crop').onclick=()=>editPages('crop');button('auto-orient').onclick=()=>editPages('orient');button('auto-enhance').onclick=()=>editPages('auto');button('undo-edit').onclick=()=>editPages('undo');button('redo-edit').onclick=()=>editPages('redo');button('restore-original').onclick=()=>editPages('restore');
 select('preview-version').onchange=()=>{updateThumbnails();renderPreview();};
 select('zoom').onchange=renderPreview;
 button('fit').onclick=()=>{select('zoom').value='fit';renderPreview();};
@@ -332,18 +335,44 @@ function showTab(name:string):void {
 }
 for(const [index,name] of ['capture','process','details','activity'].entries()){
   const tab=button('tab-'+name);tab.onclick=()=>showTab(name);
-  tab.onkeydown=event=>{if(event.key!=='ArrowLeft'&&event.key!=='ArrowRight')return;event.preventDefault();const next=['capture','process','details','activity'][(index+(event.key==='ArrowRight'?1:3))%4]!;showTab(next);button('tab-'+next).focus();};
+  tab.onkeydown=event=>{if(event.altKey||event.metaKey||event.ctrlKey||event.shiftKey||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=['capture','process','details','activity'][event.key==='Home'?0:event.key==='End'?3:(index+(event.key==='ArrowRight'?1:3))%4]!;showTab(next);button('tab-'+next).focus();};
 }
 const help=element<HTMLDialogElement>('help-dialog');button('help').onclick=()=>help.showModal();button('close-help').onclick=()=>help.close();
 function theme(value:string):void {
-  document.documentElement.dataset.theme=value;button('theme').setAttribute('aria-label',value==='dark'?'Switch to light theme':'Switch to dark theme');button('theme').title=value==='dark'?'Switch to light theme':'Switch to dark theme';
+  const label=value==='dark'?'Switch to light theme':'Switch to dark theme';document.documentElement.dataset.theme=value;button('theme').setAttribute('aria-label',label);button('theme').dataset.shortcutTitle=label;button('theme').title=label+(button('theme').dataset.shortcutSuffix??'');
 }
 try{theme(localStorage.getItem('ff680w-theme')==='light'?'light':'dark');}catch{theme('dark');}
 button('theme').onclick=()=>{const value=document.documentElement.dataset.theme==='dark'?'light':'dark';theme(value);try{localStorage.setItem('ff680w-theme',value);}catch{}};
-document.addEventListener('keydown',event=>{
-  if(busy||help.open||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey||!(event.target instanceof HTMLElement)||event.target.closest('input,select,textarea,[role=tab]'))return;
-  if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();selectPage(selected+(event.key==='ArrowRight'?1:-1));}
-});
+const shortcutDialog=element<HTMLDialogElement>('shortcuts-dialog');
+button('shortcuts').onclick=()=>shortcutDialog.showModal();
+button('close-shortcuts').onclick=()=>shortcutDialog.close();
+button('help-shortcuts').onclick=()=>{help.close();shortcutDialog.showModal();};
+function revealInspector(name:string):void {
+  showTab(name);workspace.classList.remove('inspector-hidden');
+  if(window.matchMedia('(max-width:760px)').matches){workspace.classList.add('inspector-open');workspace.classList.remove('library-open');}
+  panelState();
+}
+const shortcutCommands=new Map(SHORTCUTS.map(command=>[command.id,command]));
+const editCommands=new Set(['edit-right','edit-left','undo-edit','redo-edit','auto-crop','auto-orient','auto-enhance','restore-original','apply-color','remove-color','import-profile','compare-color','calibrate-color']);
+installShortcuts({document,mac:/Mac|iPhone|iPad/.test(navigator.platform),execute:id=>{
+  if(id==='stop'&&(workspace.classList.contains('library-open')||workspace.classList.contains('inspector-open'))){workspace.classList.remove('library-open','inspector-open');panelState();button('toggle-library').focus();return true;}
+  const controlId=shortcutCommands.get(id)?.button;
+  if(controlId&&!id.startsWith('tab-')){
+    const target=button(controlId);if(target.disabled||target.closest('[hidden]')&&!(editCommands.has(id)||['read','download-original'].includes(id)))return false;
+    if(editCommands.has(id))revealInspector('process');
+    target.click();return true;
+  }
+  if(id.startsWith('tab-')){revealInspector(id.slice(4));return true;}
+  if(id==='search'){
+    workspace.classList.remove('library-hidden');if(window.matchMedia('(max-width:1100px)').matches){workspace.classList.add('library-open');workspace.classList.remove('inspector-open');}panelState();input('job-search').focus();return true;
+  }
+  if(busy||selected<0)return false;
+  if(id==='first'||id==='last'){selectPage(id==='first'?0:currentImages.length-1);return true;}
+  if(id==='actual-size'){select('zoom').value='100';renderPreview();return true;}
+  if(id==='preview-version'){const field=select('preview-version');field.value=field.value==='original'?'processed':'original';updateThumbnails();renderPreview();return true;}
+  if(id==='export-mode'){const field=select('export-mode');field.value=field.value==='original'?'processed':'original';return true;}
+  return false;
+}});
 window.addEventListener('pagehide',()=>{abort?.abort();processor.dispose();orientation.dispose();colorUI.dispose();if(!busy)void scanner?.disconnect();});
 controls();panelState();
 void action(async()=>{

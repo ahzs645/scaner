@@ -65,7 +65,7 @@ export class ScanStore {
   }
   /** The capture stores are read-only here. Recipe history can regenerate up to
    * 20 previous revisions from the original; replacing an edit is atomic. */
-  async saveEdit(jobId:string,filename:string,result:ProcessingResult,historyOverride?:ProcessingRecipe[]):Promise<SavedEdit> {
+  async saveEdit(jobId:string,filename:string,result:ProcessingResult,historyOverride?:ProcessingRecipe[],redoOverride:ProcessingRecipe[]=[]):Promise<SavedEdit> {
     const db=await this.open(),tx=db.transaction(['images','edits'],'readwrite'),done=this.complete(tx);
     let saved:SavedEdit|undefined,validationError:unknown;
     const fail=(error:unknown)=>{validationError=error;tx.abort();};
@@ -82,13 +82,13 @@ export class ScanStore {
           try {
             const record=previous.result as SavedEdit|undefined;
             const history=historyOverride??[...(record?.history??[]),record?.recipe??{version:1,rotation:0,crop:null}].slice(-20);
-            if(history.length>20)throw Error('Edit history exceeds 20 revisions');
-            for(const recipe of history)validateRecipe(recipe,original.width,original.height);
+            if(history.length>20||redoOverride.length>20)throw Error('Edit history exceeds 20 revisions');
+            for(const recipe of [...history,...redoOverride])validateRecipe(recipe,original.width,original.height);
             const entries=tx.objectStore('edits').index('job').getAll(jobId);
             entries.onsuccess=()=>{
               const bytes=(entries.result as SavedEdit[]).filter(edit=>edit.filename!==filename).reduce((sum,edit)=>sum+edit.blob.size,0)+result.blob.size;
               if(bytes>512*1024*1024){fail(Error('Processed pages exceed the 512 MiB job budget'));return;}
-              saved=structuredClone({...result,jobId,filename,updated:new Date().toISOString(),history});tx.objectStore('edits').put(saved);
+              saved=structuredClone({...result,jobId,filename,updated:new Date().toISOString(),history,redo:redoOverride});tx.objectStore('edits').put(saved);
             };
           }catch(error){fail(error);}
         };

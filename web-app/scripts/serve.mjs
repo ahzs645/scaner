@@ -3,6 +3,8 @@ import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {resolve,sep} from 'node:path';
 const root=resolve('dist'),port=Number(process.env.SCANNER_WEB_PORT||8765);
+// Opt-in same-origin frames only for the isolated browser integration harness.
+const testFrames=process.env.SCANNER_BROWSER_TEST_FRAMES==='1'&&port!==8765;
 const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json','.wasm':'application/wasm'};
 createServer(async(req,res)=>{
   if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);res.end();return;}
@@ -16,7 +18,7 @@ createServer(async(req,res)=>{
       ? `default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src http://127.0.0.1:${port}/vendor/color/; object-src 'none'`
       : path==='/vendor/ocr/worker.min.js'
       ? `default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src http://127.0.0.1:${port}/vendor/ocr/; object-src 'none'`
-      : "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+      : `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors ${testFrames?"'self'":"'none'"}`;
     res.writeHead(200,{'Content-Type':mime[extension]||'application/octet-stream','Cache-Control':'no-store','Content-Security-Policy':csp,'X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:data);
   }catch{res.writeHead(404);res.end('Not found');}
 }).listen(port,'127.0.0.1',()=>process.stdout.write(`Static browser app: http://127.0.0.1:${port}/\n`));

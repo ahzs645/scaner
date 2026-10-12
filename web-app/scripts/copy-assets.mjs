@@ -1,7 +1,7 @@
 import {copyFile,unlink,mkdir,readFile,writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 // Validation pages are generated only on demand and excluded from deploy builds.
-for(const name of ['pipeline-check.html','pipeline-check.js','color-check.html','color-check.js','color-fixture.js','color-ui-check.html','color-ui-check.js','color-reference.js'])try{await unlink('dist/'+name);}catch(error){if(error.code!=='ENOENT')throw error;}
+for(const name of ['pipeline-check.html','pipeline-check.js','color-check.html','color-check.js','color-fixture.js','color-ui-check.html','color-ui-check.js','color-reference.js','shortcuts-check.html','shortcuts-check.js'])try{await unlink('dist/'+name);}catch(error){if(error.code!=='ENOENT')throw error;}
 for (const name of ['index.html','style.css']) await copyFile('src/'+name,'dist/'+name);
 for (const name of ['COPYING','NOTICE']) await copyFile(name,'dist/'+name);
 const assetRoot='dist/vendor/ocr';

@@ -28,6 +28,13 @@ screens, the toolbar buttons open the job browser and inspector as drawers.
 Use the help button for scanner ownership, storage and feature limitations.
 [Interface validation](../docs/scan-studio-interface.md) records browser checks.
 
+## Keyboard shortcuts
+
+Use the keyboard button in the header or press `?` for the complete guide.
+`R` / `Shift+R` rotate, Command/Ctrl+Z undoes, Command/Ctrl+Shift+Z redoes,
+and Command/Ctrl+S exports. Undo/redo persist after reload. Letter shortcuts
+can be disabled in the guide. See [shortcut behavior and testing](../docs/keyboard-shortcuts.md).
+
 ## Run locally
 
 ```bash

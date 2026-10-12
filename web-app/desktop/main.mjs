@@ -5,6 +5,7 @@ import {dirname,resolve,sep,extname} from 'node:path';
 import {discoverNetworkScanners,createDnsSdRunner,resolveNetworkAddress} from './discovery.mjs';
 import {scanNetwork} from './network-scanner.mjs';
 import {ScanStream} from './scan-stream.mjs';
+import {installRendererShortcuts} from './keyboard.mjs';
 import {FF680W_PROFILE} from '../dist/profiles/ff680w.js';
 import {readNetworkSettings} from './network-settings.mjs';
 import {APP_SCHEME,APP_HOST,APP_ORIGIN,isAppURL,isPrivateIPv4,assertMainFrameSender} from './security.mjs';
@@ -41,6 +42,7 @@ ownSession.protocol.handle(APP_SCHEME,async request=>{
   }catch{return new Response('Not found',{status:404});}
 });
 window=new BrowserWindow({width:1440,height:1000,minWidth:860,minHeight:650,title:'Scan Studio',backgroundColor:'#252529',webPreferences:{session:ownSession,preload:resolve(dirname(fileURLToPath(import.meta.url)),'preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false,webSecurity:true}});
+installRendererShortcuts(window.webContents);
 window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
 window.webContents.on('will-navigate',(event,url)=>{if(!isAppURL(url))event.preventDefault();});
 ownSession.setPermissionCheckHandler((contents,permission,origin)=>contents===window.webContents&&permission==='usb'&&origin===APP_ORIGIN);
