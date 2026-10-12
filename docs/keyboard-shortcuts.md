@@ -23,7 +23,8 @@ in the header, or press `?`. macOS uses Command; Windows/Linux use Control.
 | Saved jobs / inspector / search saved jobs | L / I / slash |
 | Connect USB / read device settings / disconnect | U / Shift+U / Alt/Option+U |
 | Discover / connect network scanner (Electron) | Shift+N / Alt/Option+Enter |
-| Scan / stop | Command/Ctrl+Enter / Escape |
+| Scan new document / stop | Command/Ctrl+Enter / Escape |
+| Add pages to selected saved scan | Command/Ctrl+Shift+Enter |
 | New workspace | N |
 | Export ZIP / selected page / original JPEG | Command/Ctrl+S / +Shift+S / +Alt/Option+S |
 | Switch edited / original export | B |

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {IDBFactory} from 'fake-indexeddb';
-import {ScanStore} from '../dist/storage.js';
+import {ScanStore,imageJob} from '../dist/storage.js';
 import {DEFAULT_OPTIONS} from '../dist/planner.js';
 import {editRevision} from '../dist/processing/history.js';
 
@@ -21,6 +21,84 @@ async function withStorage(run){
  try{await run({store,factory,name,decodes,closed:()=>closed,invalid:value=>{invalid=value;}});}
  finally{for(const [key,descriptor] of saved){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}}
 }
+
+test('adding duplex sheets preserves captures and edits with unique continued filenames',async()=>{
+ await withStorage(async({store,name})=>{
+  const driver={driverId:'epson-ff680w',deviceLabel:'Test scanner',deviceIdentity:{model:'FF-680W',serial:'SYNTHETIC',firmware:'TEST'}};
+  const job=await store.createJob({...DEFAULT_OPTIONS,duplex:true},driver);
+  const original=await store.saveImage(job.id,capture(),job.activeCapture);await store.saveImage(job.id,capture('001-back.jpg',{side:'back'}),job.activeCapture);await store.finish(job.id,'complete',undefined,[],job.activeCapture);
+  await store.saveEdit(job.id,original.filename,{recipe:{version:1,rotation:90,crop:null},blob:new Blob(['edited original'],{type:'image/png'}),width:3300,height:2544,notices:[]});
+  const edits=await store.edits(job.id),before=await store.images(job.id);
+  const append=await store.beginAppend(job.id,{...DEFAULT_OPTIONS,duplex:true,max_sheets:2},driver);
+  const added=await store.saveImage(job.id,capture(),append.activeCapture);await store.saveImage(job.id,capture('001-back.jpg',{side:'back'}),append.activeCapture);await store.finish(job.id,'complete',undefined,[],append.activeCapture);
+  const reopened=new ScanStore(name),images=await reopened.images(job.id),saved=(await reopened.jobs())[0];
+  assert.equal((await reopened.jobs()).length,1);assert.equal(saved.id,job.id);assert.equal(saved.images,4);assert.equal(saved.bytes,jpeg.length*4);
+  assert.deepEqual(images.map(i=>i.filename),['001-front.jpg','001-back.jpg','002-front.jpg','002-back.jpg']);assert.equal(added.sheet,2);
+  assert.equal(saved.captures.length,2);assert.equal(saved.captures[1].sheetOffset,1);assert.equal(saved.captures[1].images,2);assert.equal(saved.captures[1].status,'complete');
+  assert.deepEqual(images.slice(0,2),before);assert.deepEqual(await reopened.edits(job.id),edits);
+ });
+});
+
+test('partially saved duplex additions remain available and retries start on a fresh sheet',async()=>{
+ await withStorage(async({store})=>{
+  const job=await store.createJob({...DEFAULT_OPTIONS,duplex:true});await store.saveImage(job.id,capture(),job.activeCapture);await store.finish(job.id,'failed','Back transfer interrupted',[],job.activeCapture);
+  const append=await store.beginAppend(job.id,{...DEFAULT_OPTIONS,duplex:true},{});await store.saveImage(job.id,capture(),append.activeCapture);await store.finish(job.id,'failed','Jam',[],append.activeCapture);
+  const retry=await store.beginAppend(job.id,{...DEFAULT_OPTIONS,duplex:true},{});await store.saveImage(job.id,capture(),retry.activeCapture);await store.saveImage(job.id,capture('001-back.jpg',{side:'back'}),retry.activeCapture);await store.finish(job.id,'complete',undefined,[],retry.activeCapture);
+  assert.deepEqual((await store.images(job.id)).map(i=>i.filename),['001-front.jpg','002-front.jpg','003-front.jpg','003-back.jpg']);
+  const saved=(await store.jobs())[0];assert.equal(saved.images,4);assert.equal(saved.error,undefined);assert.equal(saved.captures[0].error,'Back transfer interrupted');assert.equal(saved.captures[1].error,'Jam');
+ });
+});
+
+test('new pages retain their own scanner settings and identity without relabeling earlier pages',async()=>{
+ await withStorage(async({store})=>{
+  const driver={driverId:'epson-ff680w',deviceLabel:'Original scanner',deviceIdentity:{model:'FF-680W',serial:'SYNTHETIC-A',firmware:'TEST'}};
+  const job=await store.createJob({...DEFAULT_OPTIONS,mode:'color',dpi:300,color_capture:'neutral-v1'},driver);await store.saveImage(job.id,capture(),job.activeCapture);await store.finish(job.id,'complete',undefined,[],job.activeCapture);
+  const next={...driver,deviceIdentity:{...driver.deviceIdentity,serial:'SYNTHETIC-B'}};
+  const append=await store.beginAppend(job.id,{...DEFAULT_OPTIONS,mode:'gray',dpi:200},next);await store.saveImage(job.id,capture(),append.activeCapture);await store.finish(job.id,'complete',undefined,[],append.activeCapture);
+  const images=await store.images(job.id),saved=(await store.jobs())[0];
+  assert.equal(saved.options.mode,'color');assert.equal(imageJob(saved,images[0]).options.dpi,300);assert.equal(imageJob(saved,images[0]).deviceIdentity.serial,'SYNTHETIC-A');
+  assert.equal(imageJob(saved,images[1]).options.mode,'gray');assert.equal(imageJob(saved,images[1]).options.dpi,200);assert.equal(imageJob(saved,images[1]).deviceIdentity.serial,'SYNTHETIC-B');
+ });
+});
+
+test('concurrent or stale capture callbacks cannot write into the next addition',async()=>{
+ await withStorage(async({store})=>{
+  const job=await store.createJob({...DEFAULT_OPTIONS});await store.saveImage(job.id,capture(),job.activeCapture);
+  await assert.rejects(store.beginAppend(job.id,DEFAULT_OPTIONS,{}),/already being captured/);await store.finish(job.id,'complete',undefined,[],job.activeCapture);
+  const append=await store.beginAppend(job.id,DEFAULT_OPTIONS,{});
+  await assert.rejects(store.saveImage(job.id,capture(),job.activeCapture));await assert.rejects(store.finish(job.id,'failed','Stale',[],job.activeCapture));
+  assert.equal((await store.jobs())[0].activeCapture,append.activeCapture);assert.equal((await store.images(job.id)).length,1);
+  await store.saveImage(job.id,capture(),append.activeCapture);await assert.rejects(store.saveImage(job.id,capture(),append.activeCapture));
+  assert.equal((await store.jobs())[0].images,2);
+ });
+});
+
+test('append can recover an interrupted capture under a caller-held lock and respects the shared budget',async()=>{
+ await withStorage(async({store,factory,name})=>{
+  const job=await store.createJob({...DEFAULT_OPTIONS});await store.saveImage(job.id,capture(),job.activeCapture);
+  const append=await store.beginAppend(job.id,DEFAULT_OPTIONS,{},true);assert.equal(append.captures[0].status,'failed');assert.match(append.captures[0].error,/interrupted/);
+  await alterJob(factory,name,job.id,{bytes:512*1024*1024});await assert.rejects(store.saveImage(job.id,capture(),append.activeCapture));
+  assert.equal((await store.images(job.id)).length,1);assert.equal((await store.jobs())[0].captures[1].images,0);
+ });
+});
+
+test('a full saved scan rejects additions before changing its capture state',async()=>{
+ await withStorage(async({store,factory,name})=>{
+  const job=await store.createJob(DEFAULT_OPTIONS);await store.saveImage(job.id,capture());await store.finish(job.id,'complete');
+  await alterJob(factory,name,job.id,{bytes:512*1024*1024});const before=await store.jobs();
+  await assert.rejects(store.beginAppend(job.id,DEFAULT_OPTIONS,{}),/512 MiB/);assert.deepEqual(await store.jobs(),before);
+ });
+});
+
+test('older jobs without capture metadata can receive new pages without changing their original settings',async()=>{
+ await withStorage(async({store,factory,name})=>{
+  const job=await store.createJob({...DEFAULT_OPTIONS});await store.saveImage(job.id,capture());await store.finish(job.id,'complete');
+  await alterJob(factory,name,job.id,{captures:undefined,activeCapture:undefined});
+  const append=await store.beginAppend(job.id,{...DEFAULT_OPTIONS,dpi:200},{});await store.saveImage(job.id,capture(),append.activeCapture);await store.finish(job.id,'complete');
+  assert.equal((await store.images(job.id))[1].filename,'002-front.jpg');assert.equal((await store.jobs())[0].options.dpi,DEFAULT_OPTIONS.dpi);
+  assert.equal(imageJob(job,{filename:'legacy.jpg'}).options.dpi,DEFAULT_OPTIONS.dpi);
+ });
+});
 
 test('undo and redo survive reopening storage, branch on a new edit, and preserve original capture bytes',async()=>{
  await withStorage(async({store,name})=>{

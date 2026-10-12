@@ -28,6 +28,15 @@ screens, the toolbar buttons open the job browser and inspector as drawers.
 Use the help button for scanner ownership, storage and feature limitations.
 [Interface validation](../docs/scan-studio-interface.md) records browser checks.
 
+## Add pages to a saved scan
+
+Choose a document in **My scans** and click **Add pages**. Load more sheets,
+connect the scanner, then choose **Add pages to this scan**. The new pages join
+that document and its export; existing pages and edits are kept. Use
+Command/Ctrl+Shift+Enter to add, or **Scan as new document** to create a separate
+item. See [continuing scans](../docs/continue-scans.md) for mixed settings and
+interrupted capture behavior.
+
 ## Keyboard shortcuts
 
 Use the keyboard button in the header or press `?` for the complete guide.

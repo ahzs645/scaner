@@ -13,7 +13,7 @@ import {originalRecipe,isEdited,applyOrientation} from './processing/types.js';
 import {editRevision} from './processing/history.js';
 import {installShortcuts,SHORTCUTS} from './shortcuts.js';
 import type {ProcessingRecipe,ProcessingResult,SavedEdit} from './processing/types.js';
-import {ScanStore} from './storage.js';
+import {ScanStore,imageJob} from './storage.js';
 import type {Job,SavedImage} from './storage.js';
 import {createZip} from './zip.js';
 
@@ -42,7 +42,7 @@ const bytesLabel=(bytes:number)=>bytes<1024?`${bytes} B`:bytes<1024*1024?`${(byt
 const icon=(name:string)=>{const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),use=document.createElementNS(svg.namespaceURI,'use');use.setAttribute('href','#i-'+name);svg.append(use);svg.setAttribute('aria-hidden','true');return svg;};
 const log=(text:string)=>{const target=element('log');target.textContent+=new Date().toLocaleTimeString()+' '+text+'\n';target.scrollTop=target.scrollHeight;};
 const state=(text:string)=>{element('status').textContent=text;};
-const colorUI=new ColorUI({current:()=>({job:currentJob,image:currentImages[selected]}),preview:()=>currentImages[selected]?displayOf(currentImages[selected]!,selected).blob:undefined,apply:profile=>{colorSelection=profile;editPages(profile?'color':'remove-color');},download,changed:controls,log});
+const colorUI=new ColorUI({current:()=>({job:currentJob&&currentImages[selected]?imageJob(currentJob,currentImages[selected]!):currentJob,image:currentImages[selected]}),preview:()=>currentImages[selected]?displayOf(currentImages[selected]!,selected).blob:undefined,apply:profile=>{colorSelection=profile;editPages(profile?'color':'remove-color');},download,changed:controls,log});
 const registry=navigator.usb?createDefaultRegistry(navigator.usb,{log,onDisconnect:()=>{caps=undefined;state('Scanner disconnected');controls();}}):undefined;
 element('supported-models').textContent=SUPPORTED_DRIVERS.map(driver=>driver.profile.label).join(', ');
 
@@ -52,6 +52,10 @@ function controls():void {
   for(const id of ['read','reset','disconnect'])button(id).disabled=busy||!connected;
   button('reset').disabled=busy||!connected||scanner?.transport==='network';
   button('scan').disabled=busy||!connected||!storageReady;
+  button('append-scan').hidden=!currentJob;button('append-scan').disabled=busy||!connected||!storageReady||!currentJob;
+  const scanLabel=currentJob?'Scan as new document':'Scan loaded sheets';element('scan-label').textContent=scanLabel;button('scan').dataset.shortcutTitle=scanLabel;button('scan').title=scanLabel+(button('scan').dataset.shortcutSuffix??'');button('scan').classList.toggle('primary',!currentJob);
+  element('append-hint').hidden=!currentJob;
+  element('append-hint').textContent=currentJob?`Add to this saved scan · ${currentImages.length} pages kept. Load more paper${connected?'':', then connect the scanner'}.`:'';
   button('discover-network').disabled=busy||!desktop;select('network-scanner').disabled=busy;button('read-network').disabled=busy||!desktop||!select('network-scanner').value;
   button('stop').disabled=!abort;button('stop').textContent=phase==='processing'?'Stop image processing':'Stop after current transfer';
   button('export').disabled=busy||!currentImages.length;
@@ -75,7 +79,7 @@ function controls():void {
   element('device-dot').classList.toggle('connected',connected);
   element('status-dot').classList.toggle('connected',connected);
   element('status-dot').classList.toggle('busy',busy);
-  colorUI.setBusy(busy,hasPage&&currentJob?.options.mode==='color',!!(hasPage&&edits.get(currentImages[selected]!.filename)?.recipe.color));
+  colorUI.setBusy(busy,!!(hasPage&&currentJob&&imageJob(currentJob,currentImages[selected]!).options.mode==='color'),!!(hasPage&&edits.get(currentImages[selected]!.filename)?.recipe.color));
   constraints();
 }
 function constraints():void {
@@ -178,17 +182,17 @@ function renderPreview():void {
   element('empty-state').hidden=!!saved;element('page-frame').hidden=!saved;
   for(const [index,entry] of [...element('images').children].entries())entry.setAttribute('aria-pressed',String(index===selected));
   element('page-counter').textContent=saved?`${selected+1} / ${currentImages.length}`:'No pages';
-  const view=saved?displayOf(saved,selected):undefined,edit=saved?edits.get(saved.filename):undefined;
+  const view=saved?displayOf(saved,selected):undefined,edit=saved?edits.get(saved.filename):undefined,capture=saved&&currentJob?imageJob(currentJob,saved):undefined;
   element('page-title').textContent=saved?`${saved.filename.replace(/\.jpg$/i,view?.edited?'.png':'.jpg')} · ${view?.edited?'Edited':'Original'}`:'Document preview';
   const fields:{[id:string]:string}={
     'detail-file':saved?.filename??'—','detail-side':saved?`${saved.sheet} / ${saved.side}`:'—',
-    'detail-size':view?`${view.width} × ${view.height} px`:'—','detail-dpi':saved&&currentJob?`${currentJob.options.dpi} dpi`:'—',
-    'detail-color':saved&&currentJob?(currentJob.options.mode==='color'?'RGB · 24 bit':'Grayscale · 8 bit'):'—',
+    'detail-size':view?`${view.width} × ${view.height} px`:'—','detail-dpi':capture?`${capture.options.dpi} dpi`:'—',
+    'detail-color':capture?(capture.options.mode==='color'?'RGB · 24 bit':'Grayscale · 8 bit'):'—',
     'detail-bytes':view?`${bytesLabel(view.blob.size)} (${view.blob.size.toLocaleString()} B)`:'—'};
   for(const [id,value] of Object.entries(fields))element(id).textContent=value;
   const crop=edit?.recipe.crop;
   element('processing-info').textContent=saved?(processingMessages.get(saved.filename)??(edit&&isEdited(edit.recipe)?`Saved edit · ${edit.recipe.rotation}° rotation`+(crop?` · Crop ${crop.width} × ${crop.height} at ${crop.x}, ${crop.y}`:'')+(edit.detection?` · Boundary score ${(edit.detection.confidence*100).toFixed(0)}%`:'')+(edit.recipe.color?` · sRGB using ${edit.recipe.color.profileName}`:'')+(edit.orientation?` · ${edit.orientation.reason}`+(edit.orientation.confidence!==null?` · Text confidence ${edit.orientation.confidence.toFixed(1)}`:''):''):'No edits. Original capture is kept.'+(edit?.orientation?` · ${edit.orientation.reason}`:''))):'Choose a scanned page to edit.';
-  element('selection-summary').textContent=view?`${view.width} × ${view.height} px · ${currentJob?.options.dpi??'—'} dpi · ${bytesLabel(view.blob.size)} · ${view.edited?'PNG':'Original'}`:'No page selected';
+  element('selection-summary').textContent=view?`${view.width} × ${view.height} px · ${capture?.options.dpi??'—'} dpi · ${bytesLabel(view.blob.size)} · ${view.edited?'PNG':'Original'}`:'No page selected';
   if(!saved||!view){image.removeAttribute('src');return;}
   if(image.getAttribute('src')!==view.url)image.src=view.url;
   image.dataset.rotation='0';image.alt=`Sheet ${saved.sheet}, ${saved.side} ${view.edited?'edited':'original'} preview`;
@@ -214,8 +218,8 @@ async function processPage(saved:SavedImage,operation:EditOperation,signal?:Abor
   if(operation==='restore'){recipe.rotation=0;recipe.crop=null;delete recipe.color;}
   if(operation==='remove-color')delete recipe.color;
   if(operation==='color'){
-    if(!colorSelection||currentJob?.options.mode!=='color')throw Error('Choose a matching RGB scanner profile');
-    if(colorSelection.captureSignature&&colorSelection.captureSignature!==captureSignature(currentJob,saved.side))throw Error('Profile does not match '+saved.filename+' capture settings and scan side');
+    if(!colorSelection||!currentJob||imageJob(currentJob,saved).options.mode!=='color')throw Error('Choose a matching RGB scanner profile');
+    if(colorSelection.captureSignature&&colorSelection.captureSignature!==captureSignature(imageJob(currentJob,saved),saved.side))throw Error('Profile does not match '+saved.filename+' capture settings and scan side');
     recipe.color={profileId:colorSelection.id,profileName:colorSelection.name,intent:'relative-colorimetric',output:'srgb',source:colorSelection.source};
   }
   if(operation==='undo'||operation==='redo'){
@@ -247,7 +251,7 @@ function processTargets(selectedOnly=false):SavedImage[]{const scope=select('pro
 function editPages(operation:EditOperation,selectedOnly=false):void {
   void action(async()=>{
     const targets=processTargets(selectedOnly);
-    if(operation==='color'&&colorSelection?.captureSignature)for(const saved of targets)if(!currentJob||captureSignature(currentJob,saved.side)!==colorSelection.captureSignature)throw Error('A measured front/back profile applies only to its matching side and capture settings. Choose Selected page or import an externally validated profile.');
+    if(operation==='color'&&colorSelection?.captureSignature)for(const saved of targets)if(!currentJob||captureSignature(imageJob(currentJob,saved),saved.side)!==colorSelection.captureSignature)throw Error('A measured front/back profile applies only to its matching side and capture settings. Choose Selected page or import an externally validated profile.');
     if(!targets.length)return;abort=new AbortController();phase='processing';controls();select('preview-version').value='processed';let updated=0;
     try{for(const [index,saved] of targets.entries()){if(abort.signal.aborted)throw Error('Image processing stopped');state(`Processing page ${index+1} / ${targets.length}`);if(await processPage(saved,operation,abort.signal))updated++;}
       state(updated?`Saved edits to ${updated} ${updated===1?'page':'pages'} · originals preserved`:processingMessages.get(targets[0]!.filename)??'Pages already match this edit');
@@ -256,20 +260,24 @@ function editPages(operation:EditOperation,selectedOnly=false):void {
 }
 function renderHistory():void {
   const term=input('job-search').value.trim().toLowerCase();element('history').replaceChildren();element('job-count').textContent=String(savedJobs.length);
-  const jobs=savedJobs.filter(job=>`${dateLabel(job)} ${timeLabel(job)} ${job.status} ${job.options.mode} ${job.options.dpi} ${job.id}`.toLowerCase().includes(term));
+  const jobs=savedJobs.filter(job=>`${dateLabel(job)} ${timeLabel(job)} ${job.status} ${[job.options,...(job.captures??[]).filter(capture=>capture.images).map(capture=>capture.options)].map(options=>options.mode+' '+options.dpi).join(' ')} ${job.id}`.toLowerCase().includes(term));
   if(!jobs.length){const empty=document.createElement('p');empty.className='empty-list';empty.textContent=term?'No matching scans.':'Your saved scans will appear here.';element('history').append(empty);return;}
   for(const job of jobs){
     const entry=document.createElement('button'),badge=document.createElement('span'),text=document.createElement('span'),name=document.createElement('strong'),meta=document.createElement('small'),status=document.createElement('span');
     entry.className='job';entry.setAttribute('aria-current',String(job.id===currentJob?.id));entry.title=job.id;
     badge.className='job-icon';badge.append(icon('pages'));text.className='job-text';name.textContent=dateLabel(job)+' · '+timeLabel(job);
-    meta.textContent=`${job.images} ${job.images===1?'page':'pages'} · ${job.options.mode==='color'?'Color':'Gray'} · ${job.options.dpi} dpi`;
+    const formats=new Set([job.options,...(job.captures??[]).filter(capture=>capture.images).map(capture=>capture.options)].map(options=>options.mode+' '+options.dpi));
+    meta.textContent=`${job.images} ${job.images===1?'page':'pages'} · `+(formats.size>1?'Mixed capture settings':`${job.options.mode==='color'?'Color':'Gray'} · ${job.options.dpi} dpi`);
     status.className='job-status'+(job.status==='complete'?'':' incomplete');status.textContent=job.status==='complete'?'Complete':job.status==='scanning'?'Interrupted':`${job.images} pages preserved · Incomplete`;
     text.append(name,meta,status);entry.append(badge,text);entry.disabled=busy;
-    entry.onclick=()=>void action(async()=>{await loadJob(job);renderHistory();if(window.matchMedia('(max-width:1100px)').matches)workspace.classList.remove('library-open');panelState();});element('history').append(entry);
+    entry.onclick=()=>void action(async()=>{await loadJob(job);renderHistory();if(window.matchMedia('(max-width:1100px)').matches)workspace.classList.remove('library-open');panelState();});
+    const row=document.createElement('div');row.className='job-row';const add=document.createElement('button');add.className='job-add';add.textContent='Add pages';add.setAttribute('aria-label',`Add pages to scan from ${dateLabel(job)} at ${timeLabel(job)}`);add.disabled=busy;
+    add.onclick=()=>void action(async()=>{await loadJob(job);renderHistory();revealInspector('capture');workspace.classList.remove('library-open');panelState();state(scanner?.connected?'Load more paper, then choose Add pages to this scan':'Connect the scanner, then add pages to this scan');});
+    row.append(entry,add);element('history').append(row);
   }
 }
 async function loadJob(job:Job):Promise<void> {
-  const [images,savedEdits]=await Promise.all([store.images(job.id),store.edits(job.id)]);currentJob=job;clearView();applyOptions(job.options);
+  const [images,savedEdits]=await Promise.all([store.images(job.id),store.edits(job.id)]);currentJob=job;clearView();applyOptions(job.captures?.at(-1)?.options??job.options);
   for(const edit of savedEdits){edits.set(edit.filename,edit);editUrls.set(edit.filename,URL.createObjectURL(edit.blob));}
   for(const saved of images)showImage(saved);if(images.length)selectPage(0);title();
   state(job.error??(job.status==='complete'?`Saved scan · ${images.length} pages`:'Incomplete scan · completed pages preserved'));
@@ -278,22 +286,49 @@ async function history():Promise<void> {savedJobs=await store.jobs();renderHisto
 input('job-search').oninput=renderHistory;
 button('refresh').onclick=()=>void action(history);
 button('new-job').onclick=()=>void action(async()=>{currentJob=undefined;clearView();renderHistory();state(scanner?.connected?'Ready for a new scan':'Connect the scanner to start');showTab('capture');workspace.classList.remove('inspector-hidden','library-open');if(window.matchMedia('(max-width:760px)').matches)workspace.classList.add('inspector-open');document.querySelector('.document-workspace')!.classList.remove('overview');button('view-grid').setAttribute('aria-pressed','false');button('view-grid').setAttribute('aria-label','Show page overview');panelState();});
-button('scan').onclick=()=>void action(async()=>{
-  const request=options();scanner!.validateOptions(request);
+async function capturePages(append:boolean):Promise<void> {
+  const driver=scanner;if(!driver?.connected)throw Error('Connect the scanner first');
+  const request=options();driver.validateOptions(request);
   if(caps&&(!caps.resolutions.includes(request.dpi)||(request.mode==='color'?!caps.color:!caps.gray)))throw Error('Choose an image type and resolution supported by this scanner');
-  const job=await store.createJob(request,{driverId:scanner!.profile.id,deviceLabel:scanner!.profile.label,deviceIdentity:scanner!.deviceIdentity});const postCrop=input('auto-process').checked,postOrient=input('auto-orient-after').checked;currentJob=job;clearView();title();
-  document.querySelector('.document-workspace')!.classList.remove('overview');button('view-grid').setAttribute('aria-pressed','false');
-  abort=new AbortController();phase='scan';controls();log('Job '+job.id+': '+JSON.stringify(request));state('Scanning…');
-  try {
-    const result=await scanner!.scan(request,async captured=>{const saved=await store.saveImage(job.id,captured);showImage(saved);state(`Scanning · ${currentImages.length} pages saved`);},abort.signal);
-    await store.finish(job.id,'complete',undefined,result.warnings);currentJob=(await store.jobs()).find(saved=>saved.id===job.id)??job;
-    state(`Complete · ${result.sheets} ${result.sheets===1?'sheet':'sheets'} · ${result.images} pages`+(result.warnings.length?' · Cleanup warning':''));
-    if((postCrop||postOrient)&&!abort.signal.aborted){phase='processing';controls();let processingError:string|undefined,processed=0;for(const [index,saved] of currentImages.entries()){try{if(abort.signal.aborted)break;state(`Processing page ${index+1} / ${currentImages.length}`);if(await processPage(saved,postCrop&&postOrient?'auto':postCrop?'crop':'orient',abort.signal))processed++;}catch(error){processingError=message(error);log('Post-capture processing: '+processingError+' · originals preserved');break;}}state(abort.signal.aborted?'Capture complete · image processing stopped':processingError?'Capture complete · image processing failed · originals preserved':`Capture complete · ${processed} pages edited · ${currentImages.length-processed} unchanged`);}
-  }catch(error){
-    const description=message(error);try{await store.finish(job.id,'failed',description);}catch(storageError){log('Job record update: '+message(storageError));}
-    currentJob={...job,status:'failed',images:currentImages.length,error:description};state(description);log(description);
-  }finally{abort=undefined;phase=undefined;await history();controls();}
-});
+  const existing=append?currentJob:undefined;if(append&&!existing)throw Error('Choose a saved scan in My scans first');
+  const metadata={driverId:driver.profile.id,deviceLabel:driver.profile.label,deviceIdentity:driver.deviceIdentity};
+  const initial=existing?undefined:await store.createJob(request,metadata);
+  const run=async(recoverInterrupted:boolean)=>{
+    const job=existing?await store.beginAppend(existing.id,request,metadata,recoverInterrupted):initial!;
+    const captureId=job.activeCapture!,postCrop=input('auto-process').checked,postOrient=input('auto-orient-after').checked;
+    currentJob=job;if(existing)await loadJob(job);else clearView();const previousPages=currentImages.length;title();renderHistory();
+    document.querySelector('.document-workspace')!.classList.remove('overview');button('view-grid').setAttribute('aria-pressed','false');button('view-grid').setAttribute('aria-label','Show page overview');
+    abort=new AbortController();phase='scan';controls();log((existing?'Adding pages to ':'Job ')+job.id+': '+JSON.stringify(request));state(existing?'Adding pages…':'Scanning…');
+    const added:SavedImage[]=[];
+    try {
+      const result=await driver.scan(request,async captured=>{const saved=await store.saveImage(job.id,captured,captureId);added.push(saved);showImage(saved);state(`${existing?'Adding':'Scanning'} · ${added.length} new pages saved · ${currentImages.length} total`);},abort.signal);
+      await store.finish(job.id,'complete',undefined,result.warnings,captureId);
+      state(existing?`Added ${added.length} pages · ${currentImages.length} pages in this scan`:`Complete · ${result.sheets} ${result.sheets===1?'sheet':'sheets'} · ${result.images} pages`+(result.warnings.length?' · Cleanup warning':''));
+      if((postCrop||postOrient)&&!abort.signal.aborted){
+        phase='processing';controls();let processingError:string|undefined,processed=0;
+        for(const [index,saved] of added.entries()){try{if(abort.signal.aborted)break;state(`Processing added page ${index+1} / ${added.length}`);if(await processPage(saved,postCrop&&postOrient?'auto':postCrop?'crop':'orient',abort.signal))processed++;}catch(error){processingError=message(error);log('Post-capture processing: '+processingError+' · originals preserved');break;}}
+        state(abort.signal.aborted?'Capture complete · image processing stopped':processingError?'Capture complete · image processing failed · originals preserved':`Capture complete · ${added.length} new pages · ${processed} edited · ${currentImages.length} total`);
+      }
+    }catch(error){
+      const description=message(error);try{await store.finish(job.id,'failed',description,[],captureId);}catch(storageError){log('Job record update: '+message(storageError));}
+      state((existing?`Add pages stopped · ${currentImages.length} pages preserved · `:'')+description);log(description);
+    }finally{
+      abort=undefined;phase=undefined;
+      try{
+        const updated=(await store.jobs()).find(saved=>saved.id===job.id);if(updated)currentJob=updated;
+        // Canonical sheet/side order after interleaved duplex deliveries.
+        const selectedFile=added[0]?.filename,current=currentJob;
+        if(current){const status=element('status').textContent??'';await loadJob(current);if(selectedFile)selectPage(currentImages.findIndex(image=>image.filename===selectedFile));else if(previousPages)selectPage(Math.min(previousPages-1,currentImages.length-1));state(status);}
+        await history();
+      }finally{controls();}
+    }
+  };
+  if(navigator.locks){
+    await navigator.locks.request('scan-studio-capture:'+(existing?.id??initial!.id),{ifAvailable:true},async lock=>{if(!lock)throw Error('This scan is being captured in another window. Wait for it to finish.');await run(true);});
+  }else await run(false);
+}
+button('scan').onclick=()=>void action(()=>capturePages(false));
+button('append-scan').onclick=()=>void action(()=>capturePages(true));
 function download(blob:Blob,filename:string):void {
   const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
@@ -303,7 +338,7 @@ button('export').onclick=()=>void action(async()=>{
   const descriptors=currentImages.map(image=>{const edit=edits.get(image.filename),useEdit=processed&&edit&&isEdited(edit.recipe);return {image,edit:processed?edit:undefined,blob:useEdit?edit.blob:image.blob,filename:useEdit?image.filename.replace(/\.jpg$/i,'.png'):image.filename,width:useEdit?edit.width:image.width,height:useEdit?edit.height:image.height};});
   const entries=await Promise.all(descriptors.map(async page=>({name:page.filename,data:new Uint8Array(await page.blob.arrayBuffer())})));
   const persisted=(await store.jobs()).find(job=>job.id===currentJob!.id)??currentJob;
-  const manifest={...persisted,exportVersion:processed?'processed':'original',captureBytes:persisted.bytes,bytes:descriptors.reduce((sum,page)=>sum+page.blob.size,0),images:descriptors.map(page=>({filename:page.filename,originalFilename:page.image.filename,sheet:page.image.sheet,side:page.image.side,width:page.width,height:page.height,bytes:page.blob.size,originalWidth:page.image.width,originalHeight:page.image.height,...(page.edit?{processing:{recipe:page.edit.recipe,updated:page.edit.updated,detection:page.edit.detection,orientation:page.edit.orientation,notices:page.edit.notices}}:{})}))};
+  const manifest={...persisted,exportVersion:processed?'processed':'original',captureBytes:persisted.bytes,bytes:descriptors.reduce((sum,page)=>sum+page.blob.size,0),images:descriptors.map(page=>({filename:page.filename,originalFilename:page.image.filename,sheet:page.image.sheet,side:page.image.side,width:page.width,height:page.height,bytes:page.blob.size,originalWidth:page.image.width,originalHeight:page.image.height,capture:page.image.capture??{options:persisted.options,driverId:persisted.driverId,deviceLabel:persisted.deviceLabel,deviceIdentity:persisted.deviceIdentity},captureId:page.image.captureId,...(page.edit?{processing:{recipe:page.edit.recipe,updated:page.edit.updated,detection:page.edit.detection,orientation:page.edit.orientation,notices:page.edit.notices}}:{})}))};
   if(processed){const ids=[...new Set(descriptors.flatMap(page=>page.edit?.recipe.color?[page.edit.recipe.color.profileId]:[]))];for(const id of ids){const profile=await colorUI.library.get(id);const stem=id.slice(4);entries.push({name:'source-profile-'+stem+'.icc',data:Uint8Array.from(profile.bytes)});entries.push({name:'source-profile-'+stem+'.json',data:new TextEncoder().encode(JSON.stringify({...profile,bytes:undefined},null,2))});}}
   entries.push({name:'scan-job.json',data:new TextEncoder().encode(JSON.stringify(manifest,null,2))});
   download(createZip(entries),'scan-studio-'+(processed?'processed':'original')+'-'+currentJob.id+'.zip');log('ZIP exported locally · '+(processed?'edited pages':'original JPEGs'));state(`Exported ${currentImages.length} ${processed?'processed':'original'} pages`);

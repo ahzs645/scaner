@@ -27,6 +27,9 @@ Saved scans belong to the current browser and website origin. Jobs from the
 localhost development app do not automatically move to GitHub Pages. Export
 anything you need to retain before clearing browser storage.
 
+Saved items in **My scans** can receive additional sheets with **Add pages**.
+See [continuing a scan](docs/continue-scans.md) for the workflow.
+
 See [keyboard shortcuts](docs/keyboard-shortcuts.md) or press `?` in the app
 for capture, editing, navigation and export commands.
 

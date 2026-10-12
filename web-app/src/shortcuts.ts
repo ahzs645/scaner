@@ -10,7 +10,8 @@ export const SHORTCUTS:readonly ShortcutCommand[]=[
   {id:'disconnect',label:'Disconnect scanner',group:'Capture',button:'disconnect',keys:[key('u',{alt:true})]},
   {id:'discover-network',label:'Find network scanners (desktop)',group:'Capture',button:'discover-network',keys:[key('n',{shift:true})]},
   {id:'read-network',label:'Connect selected network scanner (desktop)',group:'Capture',button:'read-network',keys:[key('Enter',{alt:true})]},
-  {id:'scan',label:'Scan loaded sheets',group:'Capture',button:'scan',keys:[key('Enter',{mod:true})]},
+  {id:'scan',label:'Scan a new document',group:'Capture',button:'scan',keys:[key('Enter',{mod:true})]},
+  {id:'append-scan',label:'Add pages to this scan',group:'Capture',button:'append-scan',keys:[key('Enter',{mod:true,shift:true})]},
   {id:'stop',label:'Stop capture or processing',group:'Capture',button:'stop',keys:[key('Escape')]},
   {id:'new-job',label:'New scan workspace',group:'Capture',button:'new-job',keys:[key('n')]},
   {id:'read',label:'Read device settings',group:'Capture',button:'read',keys:[key('u',{shift:true})]},
@@ -117,7 +118,7 @@ export function installShortcuts(options:{document:Document;mac:boolean;execute(
     // Escape in a dialog uses native cancel, including its existing cleanup hooks.
     if(doc.querySelector('dialog[open]'))return;
     const command=matchShortcut(event,options.mac,singleKeys);
-    const global=command&&['scan','export','download-page','download-original'].includes(command.id);
+    const global=command&&['scan','append-scan','export','download-page','download-original'].includes(command.id);
     if(!global&&(ownsKeyboard(event.composedPath()[0]??event.target,event.key)||doc.getSelection()?.toString()))return;
     if(command&&options.execute(command.id))event.preventDefault();
   };

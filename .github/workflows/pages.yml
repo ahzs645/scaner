@@ -44,7 +44,7 @@ jobs:
           test -f dist/main.js
           test -f dist/vendor/color/lcms.wasm
           test -f dist/vendor/ocr/lang/osd.traineddata.gz
-          for excluded in desktop desktop-output node_modules scans pipeline-check.html color-check.html color-ui-check.html shortcuts-check.html; do
+          for excluded in desktop desktop-output node_modules scans pipeline-check.html color-check.html color-ui-check.html shortcuts-check.html append-check.html; do
             test ! -e "dist/$excluded"
           done
       - name: Configure Pages
