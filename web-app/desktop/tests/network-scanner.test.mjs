@@ -18,8 +18,8 @@ async function fixture(config={}) {
   const commands=[],writes=[],clients=new Set(),issues=[];let connections=0;
   const blocks=config.blocks??[img('#typIMGA#pend000#---'),img('#typIMGB#pend000#lftd000#---')];
   const server=createServer(socket=>{
-    connections++;clients.add(socket);socket.on('close',()=>clients.delete(socket));socket.on('error',()=>{});
-    let incoming=Buffer.alloc(0),staged,pendingData,index=0;
+    const connection=++connections;clients.add(socket);socket.on('close',()=>clients.delete(socket));socket.on('error',()=>{});
+    let incoming=Buffer.alloc(0),staged,pendingData,lateImageReply,index=0;
     const send=data=>{if(config.fragment){for(let i=0;i<data.length;i+=config.fragment)socket.write(data.subarray(i,i+config.fragment));}else socket.write(data);};
     send(frame(Buffer.from('0104000000','hex'),0x8000));
     const answer=(command,data=Buffer.alloc(0),tags='#---')=>{pendingData=data;send(frame(header(command,data.length,tags)));};
@@ -54,8 +54,13 @@ async function fixture(config={}) {
         else if(command==='CAPA')answer(command,Buffer.from(config.capa??CAPA));
         else if(command==='STAT')answer(command,Buffer.alloc(0),config.statTags??'#---');
         else if(command==='IMG '){const block=blocks[index++];assert.ok(block,'unexpected extra IMG request');pendingData=block.data;
-          send(frame(header(command,block.advertised??block.data.length,block.tags)));}
-        else answer(command,Buffer.alloc(0),command==='TRDT'?config.trdtTags??'#---':command==='FIN '?config.finTags??'#---':'#---');
+          const packet=frame(header(command,block.advertised??block.data.length,block.tags));
+          if(config.interruptImageReply&&connection===1){send(packet.subarray(0,14));lateImageReply=packet.subarray(14);}
+          else send(packet);}
+        else {
+          if(command==='CAN '&&lateImageReply){send(lateImageReply);lateImageReply=undefined;}
+          answer(command,Buffer.alloc(0),command==='TRDT'?config.trdtTags??'#---':command==='FIN '?config.finTags??'#---':'#---');
+        }
       }}catch(error){issues.push(error);socket.destroy();}
     });
   });
@@ -136,6 +141,23 @@ test('abort during pending IMG read rejects immediately and still attempts CAN/F
   try {const pending=scanNetwork(mock,OPTIONS,()=>{},abort.signal);await eventually(()=>mock.commands.includes('IMG '));abort.abort();
     await assert.rejects(pending,/stopped/);assert.deepEqual(mock.commands.slice(-2),['CAN ','FIN ']);await mock.released();}
   finally{await mock.close();}
+});
+
+test('abort during a fragmented IMG reply drains the late bytes before CAN and FIN',async()=>{
+  const mock=await fixture({interruptImageReply:true}),abort=new AbortController();
+  try {
+    const pending=scanNetwork(mock,OPTIONS,()=>{},abort.signal);
+    await eventually(()=>mock.commands.includes('IMG '));
+    abort.abort();
+    await assert.rejects(pending,error=>{
+      assert.match(error.message,/stopped/);
+      assert.deepEqual(error.warnings,[]);
+      return true;
+    });
+    assert.deepEqual(mock.commands.slice(-2),['CAN ','FIN ']);await mock.released();
+    const resumed=await scanNetwork(mock,OPTIONS,()=>{});
+    assert.deepEqual(resumed,{sheets:1,images:2,warnings:[]});await mock.released();
+  }finally{await mock.close();}
 });
 
 test('callback failure propagates and a pending callback is bounded by the job deadline',async()=>{

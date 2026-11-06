@@ -1,6 +1,7 @@
 import type {ImageProcessor,ImageSource,ProcessingRequest,ProcessingResult} from './types.js';
 import {validateRecipe} from './types.js';
 import type {WorkerRequest,WorkerResponse} from './worker.js';
+import {createBundledWorker} from '../worker-urls.js';
 export interface ProcessingWorker {
   onmessage:((event:MessageEvent<WorkerResponse>)=>void)|null;
   onerror:((event:ErrorEvent)=>void)|null;
@@ -10,7 +11,7 @@ export interface ProcessingWorker {
  * and earlier durable edits intact; the next call starts a fresh worker. */
 export class WorkerImageProcessor implements ImageProcessor {
   private worker?:ProcessingWorker;private sequence=0;private rejectPending?:()=>void;
-  constructor(private factory:()=>ProcessingWorker=()=>new Worker(new URL('./worker.js',import.meta.url),{type:'module'}),private timeout=60000){}
+  constructor(private factory:()=>ProcessingWorker=()=>createBundledWorker(new URL('./worker.js',import.meta.url)),private timeout=60000){}
   async process(source:ImageSource,request:ProcessingRequest,signal?:AbortSignal):Promise<ProcessingResult> {
     validateRecipe(request.recipe,source.width,source.height);
     if(signal?.aborted)throw Error('Image processing stopped');

@@ -198,9 +198,11 @@ and provides bounded Bonjour discovery plus FF-680W network settings reads.
 Live INFO/CAPA/RESA/STAT over TCP 1865 now succeed, with correct session
 initialization and cleanup. The ordinary browser website remains USB-only;
 Chrome Local Network Access does not provide raw TCP or Bonjour browsing.
-Actual network image acquisition remains a separate validation step.
-See [network driver design](docs/network-driver-design.md) and
-[browser network feasibility](docs/network-browser-feasibility.md).
+The desktop development app acquired and exported a duplex sheet over Wi‑Fi.
+The [signed Chrome Isolated Web App development build](web-app/README.md#chrome-isolated-web-app)
+also supports Bonjour discovery, FF-680W settings, and network acquisition.
+See [desktop hardware validation](docs/network-live-validation-2026-10-11.md)
+and the [Chrome IWA handoff](docs/iwa-network-handoff-2026-11-05.md).
 
 ## Earlier Python-assisted browser UI
 

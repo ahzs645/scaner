@@ -4,6 +4,7 @@ import {captureSignature} from './color/types.js';
 import './desktop.js';
 import {NetworkScannerDriver} from './network-driver.js';
 import type {NetworkScannerTarget} from './desktop.js';
+import {createIwaNetworkBridge} from './iwa-network.js';
 import {createDefaultRegistry,SUPPORTED_DRIVERS} from './profiles/index.js';
 import {cropUnavailableReason} from './capabilities.js';
 import type {ScannerDriver,Capabilities,DeviceSettings,ScanOptions} from './driver.js';
@@ -24,8 +25,12 @@ const select=(id:string)=>element<HTMLSelectElement>(id);
 const message=(error:unknown)=>error instanceof Error?error.message:String(error);
 const store=new ScanStore();
 const desktop=window.scanStudioDesktop;
+const iwa=desktop?undefined:createIwaNetworkBridge();
+const network=desktop??iwa;
 let networkTargets:NetworkScannerTarget[]=[];
-element('network-panel').hidden=!desktop;
+element('network-panel').hidden=!network;
+element('iwa-network-options').hidden=!iwa;
+if(iwa)element('network-runtime').textContent='CHROME APP';
 let busy=false,storageReady=false,abort:AbortController|undefined,currentJob:Job|undefined,caps:Capabilities|undefined;
 let currentImages:SavedImage[]=[],urls:string[]=[],savedJobs:Job[]=[],selected=-1;
 let scanner:ScannerDriver|undefined;
@@ -56,7 +61,8 @@ function controls():void {
   const scanLabel=currentJob?'Scan as new document':'Scan loaded sheets';element('scan-label').textContent=scanLabel;button('scan').dataset.shortcutTitle=scanLabel;button('scan').title=scanLabel+(button('scan').dataset.shortcutSuffix??'');button('scan').classList.toggle('primary',!currentJob);
   element('append-hint').hidden=!currentJob;
   element('append-hint').textContent=currentJob?`Add to this saved scan · ${currentImages.length} pages kept. Load more paper${connected?'':', then connect the scanner'}.`:'';
-  button('discover-network').disabled=busy||!desktop;select('network-scanner').disabled=busy;button('read-network').disabled=busy||!desktop||!select('network-scanner').value;
+  button('discover-network').disabled=busy||!network;select('network-scanner').disabled=busy;button('read-network').disabled=busy||!network||!select('network-scanner').value;
+  input('network-wifi-address').disabled=input('network-manual-address').disabled=button('use-network-address').disabled=busy||!iwa;
   button('stop').disabled=!abort;button('stop').textContent=phase==='processing'?'Stop image processing':'Stop after current transfer';
   button('export').disabled=busy||!currentImages.length;
   for(const id of ['refresh','new-job'])button(id).disabled=busy;
@@ -105,13 +111,34 @@ function settings(result:DeviceSettings):void {
 }
 select('dpi').onchange=constraints;
 select('network-scanner').onchange=controls;
-button('discover-network').onclick=()=>void action(async()=>{
-  element('network-status').textContent='Looking for scanners on this network…';select('network-scanner').replaceChildren();
-  const targets=await desktop!.discoverNetwork().catch(error=>{element('network-status').textContent=message(error);throw error;});
+function showNetworkTargets(targets:NetworkScannerTarget[]):void {
   networkTargets=targets;
-  for(const target of targets){const option=document.createElement('option');option.value=target.id;option.textContent=target.label+' · '+target.host+':'+target.port+(target.available===false?' · Busy':'');select('network-scanner').append(option);}
-  element('network-status').textContent=targets.length?`Found ${targets.length} network ${targets.length===1?'scanner':'scanners'}. Choose Connect network scanner to begin.`:'No supported scanner found. Check that it is on the same network.';
-  element('network-settings').textContent='';state(targets.length?'Network scanner found':'No network scanner found');
+  select('network-scanner').replaceChildren(...targets.map(target=>{
+    const option=document.createElement('option');
+    option.value=target.id;option.textContent=target.label+' · '+target.host+':'+target.port+(target.available===false?' · Advertised busy':'');
+    return option;
+  }));
+  element('network-settings').textContent='';
+}
+button('discover-network').onclick=()=>void action(async()=>{
+  showNetworkTargets([]);
+  element('network-status').textContent='Looking for scanners on this network…';
+  try{
+    const targets=await network!.discoverNetwork(iwa?input('network-wifi-address').value:undefined);
+    showNetworkTargets(targets);
+    element('network-status').textContent=targets.length?`Found ${targets.length} network ${targets.length===1?'scanner':'scanners'}. Choose Connect network scanner to begin.`
+      :iwa?'No supported scanner found. Check Wi-Fi or try the addresses in Network options.'
+      :'No supported scanner found. Check that it is on the same network.';
+    if(iwa&&!targets.length)element<HTMLDetailsElement>('iwa-network-options').open=true;
+    state(targets.length?'Network scanner found':'No network scanner found');
+  }catch(error){element('network-status').textContent=message(error);throw error;}
+});
+button('use-network-address').onclick=()=>void action(async()=>{
+  try{
+    showNetworkTargets([iwa!.useScannerAddress(input('network-manual-address').value)]);
+    element('network-status').textContent='Scanner address selected. Choose Connect network scanner to verify the model.';
+    state('Network scanner address selected');
+  }catch(error){element('network-status').textContent=message(error);throw error;}
 });
 button('read-network').onclick=()=>void action(async()=>{
   if(scanner?.connected)throw Error('Disconnect the current scanner first');
@@ -119,7 +146,7 @@ button('read-network').onclick=()=>void action(async()=>{
   if(!target)throw Error('Find and choose a network scanner first');
   element('network-status').textContent='Connecting to network scanner…';
   try{
-    const driver=new NetworkScannerDriver(desktop!,target);const live=await driver.connect();scanner=driver;settings(live);
+    const driver=new NetworkScannerDriver(network!,target);const live=await driver.connect();scanner=driver;settings(live);
     element('network-settings').textContent=JSON.stringify(live,null,2);
     element('network-status').textContent='Connected over the local network · scan settings above apply';
     state('Network connected · ready to scan');log('Network settings verified · no paper fed');

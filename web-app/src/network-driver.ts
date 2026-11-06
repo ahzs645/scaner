@@ -1,7 +1,7 @@
 import {colorDeviceIdentity} from './color/identity.js';
 import type {ColorDeviceIdentity} from './color/identity.js';
 import type {ScannerDriver,Capabilities,DeviceSettings,ScanOptions,CapturedImage,ScanResult} from './driver.js';
-import type {DesktopBridge,NetworkScannerTarget} from './desktop.js';
+import type {NetworkBridge,NetworkScannerTarget} from './desktop.js';
 import {FF680W_PROFILE} from './profiles/ff680w.js';
 export class NetworkScannerDriver implements ScannerDriver {
  readonly transport='network' as const;
@@ -9,7 +9,7 @@ export class NetworkScannerDriver implements ScannerDriver {
  deviceIdentity:ColorDeviceIdentity|undefined;
  connected=false;
  capabilities:Capabilities|undefined;
- constructor(private bridge:DesktopBridge,readonly target:NetworkScannerTarget) {
+ constructor(private bridge:NetworkBridge,readonly target:NetworkScannerTarget) {
   if(target.model!=='FF-680W'||target.protocol!=='epson-esci2-tcp')throw Error('Unsupported network scanner');
  }
  validateOptions(options:ScanOptions):void {this.profile.buildScanPlan(options);}

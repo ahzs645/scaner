@@ -1,3 +1,5 @@
+import {installWorkerUrlPolicy} from '../worker-urls.js';
+
 export type OrientationRotation = 0 | 90 | 180 | 270;
 export interface OrientationDecision {
   rotation: OrientationRotation | null;
@@ -146,9 +148,11 @@ export class OrientationDetector {
           if(operation.stopped) return;
           if(typeof library.createWorker !== 'function' || library.OEM?.TESSERACT_ONLY !== 0) throw Error('Local orientation engine is unavailable');
           let initializedWorker: OsdWorker | undefined;
+          installWorkerUrlPolicy();
+          const workerPath=globalThis.location?.protocol==='isolated-app:'?'iwa-worker.js':'worker.min.js';
           worker = await library.createWorker('osd', library.OEM.TESSERACT_ONLY, {
             legacyCore: true, legacyLang: true, workerBlobURL: false,
-            workerPath: new URL('../vendor/ocr/worker.min.js', import.meta.url).href,
+            workerPath: new URL('../vendor/ocr/'+workerPath, import.meta.url).href,
             corePath: new URL('../vendor/ocr/core/', import.meta.url).href,
             langPath: new URL('../vendor/ocr/lang/', import.meta.url).href,
             gzip: true, cacheMethod: 'write',

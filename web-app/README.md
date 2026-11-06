@@ -167,6 +167,44 @@ The development launch works; the independently launched Mac bundle still
 reports EHOSTUNREACH on this computer, so standalone network capture is not
 validated. See the desktop instructions for the current limitation.
 
+## Chrome Isolated Web App
+
+The signed Chrome development build uses Direct Sockets for FF-680W Bonjour
+discovery and scanning. It uses the same Epson session and image pipeline as
+Electron. Build a signed bundle with an Ed25519 PEM development key stored
+outside the repo.
+
+```sh
+npm ci --ignore-scripts
+npm run package:iwa -- /path/to/development-signing-key.pem
+```
+
+The output is `iwa-output/Scan-Studio.swbn`. Keep the same signing key to
+retain the app's identity and local library across updates. For an encrypted
+key, supply its passphrase through `WEB_BUNDLE_SIGNING_PASSPHRASE` in the build
+environment.
+
+On desktop Chrome, enable **Isolated Web Apps** and **Isolated Web App Developer
+Mode** in `chrome://flags` and relaunch. From `chrome://web-app-internals`,
+choose **Install IWA from Signed Web Bundle** and open Scan Studio from
+`chrome://apps`. The bundle contains the app assets for offline launch.
+
+1. In **Capture → Network scanners**, choose **Find network scanners** and
+   allow the local and loopback access Chrome requests for discovery.
+2. If the list is empty while a VPN or tunnel is active, open **Network
+   options**. Enter the Mac's Wi‑Fi IPv4 address and choose **Find network
+   scanners** again. You can also select a known scanner by entering its
+   private IPv4 address and choosing **Use scanner address**.
+3. Select the Epson and choose **Connect network scanner**. Scan Studio
+   verifies the FF-680W model and reads its available options.
+4. Load paper and choose **Scan loaded sheets**. To stop, use **Stop after
+   current transfer**. Completed pages are saved in the IWA library as the
+   scan runs. Use **Export** to take a copy out of that library.
+
+The [Chrome Wi‑Fi handoff](../docs/iwa-network-handoff-2026-11-05.md) records
+hardware results and the remaining installation and network cases. The
+website's USB path remains available in a regular browser tab.
+
 ## Local color profiles and calibration
 
 The Edit tab provides scanner INPUT ICC import/export, local LittleCMS WASM

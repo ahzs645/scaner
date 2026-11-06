@@ -14,3 +14,7 @@ Start with [modular drivers](modular-driver-processing.md),
 [network architecture](network-driver-design.md), and
 [color pipeline](color-pipeline.md). Upstream research commits are recorded in
 [`references/sources.json`](../references/sources.json).
+
+The [Chrome IWA network handoff](iwa-network-handoff-2026-11-05.md) records
+the FF‑680W discovery, settings, and signed-bundle tests and the remaining
+work for Scan Studio over Wi‑Fi in Chrome.

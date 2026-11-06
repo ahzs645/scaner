@@ -8,7 +8,7 @@ const key=(key:string,extra:Omit<KeyChord,'key'>={}):KeyChord=>({key,...extra});
 export const SHORTCUTS:readonly ShortcutCommand[]=[
   {id:'connect',label:'Connect USB scanner',group:'Capture',button:'connect',keys:[key('u')]},
   {id:'disconnect',label:'Disconnect scanner',group:'Capture',button:'disconnect',keys:[key('u',{alt:true})]},
-  {id:'discover-network',label:'Find network scanners (desktop)',group:'Capture',button:'discover-network',keys:[key('n',{shift:true})]},
+  {id:'discover-network',label:'Find network scanners',group:'Capture',button:'discover-network',keys:[key('n',{shift:true})]},
   {id:'read-network',label:'Connect selected network scanner (desktop)',group:'Capture',button:'read-network',keys:[key('Enter',{alt:true})]},
   {id:'scan',label:'Scan a new document',group:'Capture',button:'scan',keys:[key('Enter',{mod:true})]},
   {id:'append-scan',label:'Add pages to this scan',group:'Capture',button:'append-scan',keys:[key('Enter',{mod:true,shift:true})]},

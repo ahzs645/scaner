@@ -18,6 +18,7 @@ web-app/node_modules/
 web-app/dist/
 
 web-app/desktop-output/
+web-app/iwa-output/
 
 # Local captures, vendor analysis output and generated dependencies stay local.
 .DS_Store

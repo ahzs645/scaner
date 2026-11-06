@@ -2,6 +2,9 @@
 
 Research date: **2026-10-11**. This is a browser/platform assessment, not a new device test. No scanner connections, scans, browser sessions, or configuration changes were made for this research.
 
+The [November 5 Chrome IWA handoff](iwa-network-handoff-2026-11-05.md) records
+subsequent live FF‑680W tests, including the permissions used on Chrome 156.
+
 ## Conclusion
 
 The ordinary static browser app can use a **known HTTP(S) scanning endpoint** if that endpoint is compatible with browser requests. It cannot directly browse Bonjour/mDNS or open Epson's arbitrary TCP scanning connection. Granting Chrome local-network permission does not add those APIs. An installed Isolated Web App (IWA) can expose TCP/UDP and multicast, but that is a distinct application/distribution model.
